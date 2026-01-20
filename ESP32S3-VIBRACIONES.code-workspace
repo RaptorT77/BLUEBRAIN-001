@@ -1,0 +1,14 @@
+{
+	"folders": [
+		{
+			"path": "."
+		}
+	],
+	"settings": {
+		"clangd.arguments": [
+			"--background-index",
+			"--query-driver=**",
+			"--compile-commands-dir=c:\\ESP32S3-VIBRACIONES\\ESP32S3-VIBRACIONES\\build"
+		]
+	}
+}
