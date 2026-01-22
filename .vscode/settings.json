@@ -14,7 +14,7 @@
   "clangd.arguments": [
     "--background-index",
     "--query-driver=**",
-    "--compile-commands-dir=c:\\ESP32S3-VIBRACIONES\\ESP32S3-VIBRACIONES\\build"
+    "--compile-commands-dir=./build"
   ],
   "idf.flashType": "UART"
 }

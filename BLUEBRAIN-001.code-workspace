@@ -1,0 +1,15 @@
+{
+    "folders": [
+        {
+            "name": "BLUE-BRAIN-001",
+            "path": "."
+        }
+    ],
+    "settings": {
+        "clangd.arguments": [
+            "--background-index",
+            "--query-driver=**",
+            "--compile-commands-dir=./build"
+        ]
+    }
+}
