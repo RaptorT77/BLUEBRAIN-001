@@ -1,3 +1,3 @@
 idf_component_register(SRCS "src/bb_sensors.c"
-                    INCLUDE_DIRS "include"
-                    REQUIRES driver) // I2C, OneWire/RMT needs drivers
+                       INCLUDE_DIRS "include"
+                       REQUIRES driver esp_adc)

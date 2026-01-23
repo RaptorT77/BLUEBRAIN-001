@@ -1,8 +1,39 @@
+# --- CONFIGURACIÓN DE HARDWARE ---
+CONFIG_IDF_TARGET="esp32s3"
+# Forzamos 240MHz (Vital para FFT y Redes Neuronales).
 CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_240=y
+CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ=240
+
+# --- CONFIGURACIÓN DE MEMORIA (FLASH & PSRAM) ---
+# Ajustado a 8MB físico del XIAO S3
 CONFIG_ESPTOOLPY_FLASHSIZE_8MB=y
+
+# Mapeo de Particiones (CRÍTICO: Sin esto ignora tu archivo csv)
+CONFIG_PARTITION_TABLE_CUSTOM=y
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"
+
+# Habilitar PSRAM (Memoria RAM externa)
 CONFIG_SPIRAM=y
 CONFIG_SPIRAM_MODE_QUAD=y
+CONFIG_SPIRAM_SPEED_80M=y
+
+# Permitir que el "Heap" use la PSRAM automáticamente y alojar tareas grandes
 CONFIG_SPIRAM_USE_MALLOC=y
+CONFIG_SPIRAM_ALLOW_STACK_EXTERNAL_MEMORY=y
+
+# --- FREERTOS & SISTEMA ---
+# Tick a 1000Hz (1ms) para control preciso
 CONFIG_FREERTOS_HZ=1000
+# Stack del Main aumentado para evitar desbordamientos al inicio
+CONFIG_ESP_MAIN_TASK_STACK_SIZE=10240
+
+# --- RED Y OTA (Portal Cautivo & Updates) ---
 CONFIG_LWIP_DHCPS=y
 CONFIG_ESP_HTTPS_OTA_DECRYPT_CB=y
+
+# --- OPTIMIZACIÓN ---
+# Optimizar para Velocidad (-O2)
+CONFIG_COMPILER_OPTIMIZATION_PERF=y
+# Log Buffer aumentado
+CONFIG_LOG_DEFAULT_LEVEL_INFO=y
+CONFIG_LOG_BUFFER_SIZE=2048
