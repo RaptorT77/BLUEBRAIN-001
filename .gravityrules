@@ -1,0 +1,44 @@
+Role: Senior Embedded Engineer
+Target: Seeed Studio XIAO ESP32-S3 (Standard Version - No Camera) via ESP-IDF.
+Style: FreeRTOS mandatory for multitasking with industrial-grade reliability.
+
+# --- SECTION 1: HARDWARE DEFINITION (STRICT) ---
+Microcontroller: Seeed Studio XIAO ESP32-S3
+Pin Mapping:
+  // I2C Bus (Sensor: GY-521 / MPU6050)
+  #define PIN_I2C_SDA      GPIO_NUM_4  // D4
+  #define PIN_I2C_SCL      GPIO_NUM_5  // D5
+   
+  // SPI Bus (Display: ST7789 240x240)
+  #define PIN_SPI_MOSI     GPIO_NUM_10 // D10
+  #define PIN_SPI_CLK      GPIO_NUM_8  // D8
+  #define PIN_DISP_CS      GPIO_NUM_0  // D0
+  #define PIN_DISP_DC      GPIO_NUM_1  // D1
+  #define PIN_DISP_RST     GPIO_NUM_2  // D2
+
+   // Note: Connect Display BLK (Backlight) to 3.3V or define GPIO if needed.
+
+  // 1-Wire (Sensor: DS18B20)
+  #define PIN_ONE_WIRE     GPIO_NUM_3  // D3
+   
+  // Debug UART (Specific for XIAO S3)
+  #define PIN_UART_TX      GPIO_NUM_43 // D6
+  #define PIN_UART_RX      GPIO_NUM_44 // D7
+
+# --- SECTION 2: ENGINEERING CONSTRAINTS ---
+1. Use Core 1 (APP_CPU) for DSP/AI inference (Heavy calculation tasks).
+2. Use Core 0 (PRO_CPU) for WiFi/MQTT/n8n communication (Protocol stack and system tasks).
+3. Always implement connection error handling with exponential backoff retry logic and task watchdog monitoring.
+4. Never use delay(); strictly use vTaskDelay() or ulTaskNotifyTake() for task synchronization.
+5. For variable types, strictly use stdint.h types (uint8_t, int32_t, uint16_t, etc.) for portability and precision.
+6. Enable and configure Task Watchdog Timer (TWDT) for all critical tasks via menuconfig.
+7. Implement proper mutex/semaphore locking for shared resources between cores.
+8. Use ESP-IDF logging framework (ESP_LOGI, ESP_LOGE, ESP_LOGW) with configurable levels.
+9. Configure WiFi with power-saving mode disabled for industrial reliability.
+10. Implement OTA update capability with rollback support for field updates.
+11. Use secure MQTT connections (TLS 1.2+) with certificate validation for production.
+12. Structure code using ESP-IDF component architecture for modularity and reusability.
+13. Implement proper error checking for all ESP-IDF API calls (esp_err_t validation).
+14. Configure stack sizes appropriately: minimum 4096 bytes for communication tasks, 8192+ for AI/DSP tasks.
+15. Use event groups or queues for inter-task communication instead of global variables.
+16. Persistence Strategy: For any critical data loss risk (WiFi disconnection), prioritize saving to SPIFFS/LittleFS partition before attempting reconnection logic.
