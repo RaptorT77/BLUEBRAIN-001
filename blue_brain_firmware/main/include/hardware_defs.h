@@ -11,8 +11,8 @@
 #include "driver/gpio.h"
 
 // --- I2C Bus (MPU6050) ---
-#define PIN_I2C_SDA      GPIO_NUM_6
-#define PIN_I2C_SCL      GPIO_NUM_7
+#define PIN_I2C_SDA      GPIO_NUM_5
+#define PIN_I2C_SCL      GPIO_NUM_6
 
 // --- SPI Bus (ST7789 Display) ---
 #define PIN_SPI_MOSI     GPIO_NUM_10
