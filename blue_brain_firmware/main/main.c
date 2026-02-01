@@ -1,195 +1,121 @@
 /**
  * @file main.c
- * @brief Main Orchestrator for Blue Brain Firmware - Real Sensor Mode (3-Axis + Temp)
- * @author Blue Brain Team / Tony
+ * @brief Blue Brain Orchestrator v5.0 - Modular Architecture
+ * @author Blue Brain Team
  */
 
-#include <stdio.h>
-#include <string.h>
-#include <math.h> 
+#include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "freertos/queue.h"
-#include "esp_log.h"
-#include "esp_system.h"
 #include "nvs_flash.h"
-#include "esp_event.h"
-#include "driver/gpio.h"
-#include "esp_random.h"
-#include "driver/i2c.h"
-#include "esp_rom_sys.h" // Necesario para delays de microsegundos exactos
+#include <stdint.h> // Required for uint8_t
+#include <stdio.h>
+#include <stdlib.h> // Required for malloc/free
+#include <string.h>
 
-// --- CONFIGURACIÓN HARDWARE (XIAO ESP32-S3) ---
-#define I2C_MASTER_SCL_IO           6     // Pin D5
-#define I2C_MASTER_SDA_IO           5     // Pin D4
-#define DS18B20_GPIO                4     // Pin D3 (GPIO 4)
-#define I2C_MASTER_NUM              0     
-#define I2C_MASTER_FREQ_HZ          100000 
+// --- COMPONENTES PROPIOS ---
+#include "bb_config.h"
+#include "bb_connect.h"
+#include "bb_dsp_ai.h"
+#include "bb_power.h"
+#include "bb_sensors.h"
+#include "bb_storage.h"
+#include "bb_web_ui.h"
 
-// --- REGISTROS MPU6050 ---
-#define MPU6050_PWR_MGMT_1          0x6B  
-#define MPU6050_ACCEL_XOUT_H        0x3B  
-#define MPU6050_WHO_AM_I            0x75  
-#define ACCEL_SENSITIVITY           16384.0f // Sensibilidad para +/- 2g
+static const char *TAG = "BLUE_BRAIN_MAIN";
 
-// --- Constants & Macros ---
-#define TAG "BLUE_BRAIN"
-#define PIN_BOOT_BTN                0
+// --- TAREA DE ANÁLISIS DE VIBRACIÓN (CORE 1) ---
+void Task_Vibration_Analysis(void *pvParameters) {
+  bb_telemetry_t report;
 
-// --- Data Structures ---
-typedef struct __attribute__((packed)) {
-    uint8_t magic;           
-    uint8_t device_mac[6];   
-    uint32_t packet_id;      
-    uint32_t timestamp;      
-    float accel_x;           // Agregado: Eje X
-    float accel_y;           // Agregado: Eje Y
-    float accel_z;           // Agregado: Eje Z
-    float temp_c;            
-    uint8_t battery_pct;     
-    uint8_t ai_status;       
-    uint16_t checksum;       
-} bb_packet_t;
+  // Buffer en Heap para no desbordar el stack
+  // Allocate MAX size (defined in bb_config.h)
+  size_t buffer_size =
+      BB_N_SAMPLES * 6; // 6 bytes por muestra (int16_t x, y, z)
+  uint8_t *raw_data = (uint8_t *)calloc(1, buffer_size);
 
-// --- Funciones DS18B20 (1-Wire) ---
+  if (raw_data == NULL) {
+    ESP_LOGE(TAG,
+             "FATAL: No hay memoria para el buffer de vibración (%d bytes)",
+             buffer_size);
+    vTaskDelete(NULL);
+    return;
+  }
 
-static esp_err_t ds18b20_reset() {
-    gpio_set_direction(DS18B20_GPIO, GPIO_MODE_OUTPUT);
-    gpio_set_level(DS18B20_GPIO, 0);
-    esp_rom_delay_us(480);
-    gpio_set_direction(DS18B20_GPIO, GPIO_MODE_INPUT);
-    esp_rom_delay_us(70);
-    int presence = gpio_get_level(DS18B20_GPIO);
-    esp_rom_delay_us(410);
-    return (presence == 0) ? ESP_OK : ESP_FAIL;
-}
+  ESP_LOGI(TAG, "Tarea de Análisis Iniciada. Buffer de %d bytes reservado.",
+           buffer_size);
 
-static void ds18b20_write_byte(uint8_t data) {
-    for (int i = 0; i < 8; i++) {
-        gpio_set_direction(DS18B20_GPIO, GPIO_MODE_OUTPUT);
-        gpio_set_level(DS18B20_GPIO, 0);
-        if (data & (1 << i)) {
-            esp_rom_delay_us(2);
-            gpio_set_direction(DS18B20_GPIO, GPIO_MODE_INPUT);
-            esp_rom_delay_us(60);
-        } else {
-            esp_rom_delay_us(60);
-            gpio_set_direction(DS18B20_GPIO, GPIO_MODE_INPUT);
-            esp_rom_delay_us(2);
-        }
+  while (1) {
+    // Leer configuración actual
+    const bb_config_t *cfg = bb_config_get();
+    int current_samples = cfg->n_samples;
+
+    // Sanity check
+    if (current_samples > BB_N_SAMPLES)
+      current_samples = BB_N_SAMPLES;
+    if (current_samples < 64)
+      current_samples = 64;
+
+    ESP_LOGI(TAG, "Iniciando ráfaga de %d muestras...", current_samples);
+
+    // 1. Adquisición de Datos (Bloqueante/Precisa)
+    bb_sensors_read_accel_burst(raw_data, current_samples);
+
+    // 2. Procesamiento DSP (Cálculo de RMS, Peak, etc)
+    bb_dsp_ai_process_vibration(raw_data, current_samples, &report);
+
+    // 3. Adquisición de Temperatura
+    report.temp_c = bb_sensors_get_temp();
+
+    // 4. Telemetría Local y Remota
+    ESP_LOGW(TAG, "==== REPORTE BLUE BRAIN ====");
+    ESP_LOGI(TAG, "RMS: %.3f G | Peak: %.3f G | CF: %.2f", report.vib_rms,
+             report.vib_peak, report.crest_factor);
+    ESP_LOGI(TAG, "Temp: %.2f C", report.temp_c);
+
+    // Enviar a la cola para que bb_connect lo procese (MQTT/ESP-NOW)
+    if (xQueueTelemetry != NULL) {
+      if (xQueueSend(xQueueTelemetry, &report, 0) != pdPASS) {
+        ESP_LOGW(TAG, "Cola llena, telemetría descartada");
+      } else {
+        ESP_LOGD(TAG, "Datos enviados a Task_Comms");
+      }
     }
+
+    vTaskDelay(pdMS_TO_TICKS(5000)); // Intervalo entre reportes
+  }
 }
 
-static uint8_t ds18b20_read_byte() {
-    uint8_t data = 0;
-    for (int i = 0; i < 8; i++) {
-        gpio_set_direction(DS18B20_GPIO, GPIO_MODE_OUTPUT);
-        gpio_set_level(DS18B20_GPIO, 0);
-        esp_rom_delay_us(2);
-        gpio_set_direction(DS18B20_GPIO, GPIO_MODE_INPUT);
-        esp_rom_delay_us(10);
-        if (gpio_get_level(DS18B20_GPIO)) data |= (1 << i);
-        esp_rom_delay_us(50);
-    }
-    return data;
-}
-
-static float ds18b20_read_temp() {
-    if (ds18b20_reset() != ESP_OK) return -99.0f;
-    ds18b20_write_byte(0xCC); // Skip ROM
-    ds18b20_write_byte(0x44); // Iniciar conversión
-    vTaskDelay(pdMS_TO_TICKS(750)); // Esperar conversión
-    
-    ds18b20_reset();
-    ds18b20_write_byte(0xCC);
-    ds18b20_write_byte(0xBE); // Leer Scratchpad
-    
-    uint8_t low = ds18b20_read_byte();
-    uint8_t high = ds18b20_read_byte();
-    int16_t raw = (high << 8) | low;
-    return (float)raw / 16.0f;
-}
-
-// --- Funciones MPU6050 ---
-
-static esp_err_t mpu6050_init(uint8_t addr) {
-    uint8_t data[] = {MPU6050_PWR_MGMT_1, 0x00}; 
-    return i2c_master_write_to_device(I2C_MASTER_NUM, addr, data, sizeof(data), 1000 / portTICK_PERIOD_MS);
-}
-
-static void mpu6050_read_3axis(uint8_t addr, float *x, float *y, float *z) {
-    uint8_t raw_data[6];
-    uint8_t reg = MPU6050_ACCEL_XOUT_H;
-    
-    esp_err_t ret = i2c_master_write_read_device(I2C_MASTER_NUM, addr, &reg, 1, raw_data, 6, 1000 / portTICK_PERIOD_MS);
-
-    if (ret == ESP_OK) {
-        int16_t ix = (raw_data[0] << 8) | raw_data[1];
-        int16_t iy = (raw_data[2] << 8) | raw_data[3];
-        int16_t iz = (raw_data[4] << 8) | raw_data[5];
-
-        *x = (float)ix / ACCEL_SENSITIVITY;
-        *y = (float)iy / ACCEL_SENSITIVITY;
-        *z = (float)iz / ACCEL_SENSITIVITY;
-    }
-}
-
-// --- Task Definitions ---
-
-void Task_Acquisition(void *pvParameters) {
-    ESP_LOGI("TASK_ACQ", "Iniciando Adquisición Real...");
-    
-    uint8_t real_addr = 0x68; // Dirección detectada previamente
-    mpu6050_init(real_addr);
-
-    float ax, ay, az, temp;
-
-    while (1) {
-        // 1. Lectura REAL de Acelerómetro (3 Ejes)
-        mpu6050_read_3axis(real_addr, &ax, &ay, &az);
-
-        // 2. Lectura REAL de Temperatura
-        temp = ds18b20_read_temp();
-
-        // 3. Log Consolidado (Formato Profesional G)
-        if (temp == -99.0f) {
-            ESP_LOGE("TASK_ACQ", "ERROR SENSOR TEMP: Revisa Pin D3 y Resistencia 4.7k");
-        } else {
-            ESP_LOGI("TASK_ACQ", "TELEMETRÍA -> Accel[G]: X:%.2f Y:%.2f Z:%.2f | Temp: %.2f °C", 
-                     ax, ay, az, temp);
-        }
-
-        vTaskDelay(pdMS_TO_TICKS(1000)); // Adquisición cada 1 segundo
-    }
-}
-
-void Task_Comms(void *pvParameters) {
-    while (1) {
-        ESP_LOGI("TASK_COMMS", "Esperando datos en cola...");
-        vTaskDelay(pdMS_TO_TICKS(5000));
-    }
-}
-
-void run_measurement_mode(void) {
-    xTaskCreatePinnedToCore(Task_Acquisition, "Task_Acq", 4096, NULL, 5, NULL, 1);
-    xTaskCreatePinnedToCore(Task_Comms, "Task_Comms", 4096, NULL, 3, NULL, 0);
-    ESP_LOGI(TAG, "Measurement Mode Started on Dual Core");
-}
-
+// --- PUNTO DE ENTRADA PRINCIPAL ---
 void app_main(void) {
-    nvs_flash_init();
-    
-    // Configurar I2C
-    i2c_config_t i2c_conf = {
-        .mode = I2C_MODE_MASTER,
-        .sda_io_num = I2C_MASTER_SDA_IO,
-        .scl_io_num = I2C_MASTER_SCL_IO,
-        .sda_pullup_en = GPIO_PULLUP_ENABLE,
-        .scl_pullup_en = GPIO_PULLUP_ENABLE,
-        .master.clk_speed = I2C_MASTER_FREQ_HZ,
-    };
-    i2c_param_config(I2C_MASTER_NUM, &i2c_conf);
-    i2c_driver_install(I2C_MASTER_NUM, i2c_conf.mode, 0, 0, 0);
+  // 1. Inicializar NVS (Requerido por WiFi/OTA/MQTT/Config)
+  esp_err_t ret = nvs_flash_init();
+  if (ret == ESP_ERR_NVS_NO_FREE_PAGES ||
+      ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+    ESP_ERROR_CHECK(nvs_flash_erase());
+    ret = nvs_flash_init();
+  }
+  ESP_ERROR_CHECK(ret);
 
-    run_measurement_mode();
+  // 1.1 Cargar Configuración del Sistema (NVS)
+  ESP_ERROR_CHECK(bb_config_init());
+
+  // 1.2 Inicializar SPIFFS (Almacenamiento Local)
+  bb_storage_init();
+
+  // 2. Inicializar Sensores (I2C + MPU6050 + DS18B20 GPIO)
+  ESP_ERROR_CHECK(bb_sensors_init());
+
+  // 3. Inicializar DSP
+  bb_dsp_ai_init();
+
+  // 4. Lanzar Conectividad (WiFi + MQTT + OTA + Queue + Power) en CORE 0
+  bb_connect_init();
+
+  // 4.5 Iniciar Web UI (Dashboard + API + Captive Portal)
+  bb_web_ui_start();
+
+  // 5. Lanzar Análisis en CORE 1 (Máxima prioridad para muestreo)
+  xTaskCreatePinnedToCore(Task_Vibration_Analysis, "Vib_Analyst", 8192, NULL, 5,
+                          NULL, 1);
 }

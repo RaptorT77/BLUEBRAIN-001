@@ -1,0 +1,8 @@
+## IDF Component Manager Manifest File
+## Documentation: https://docs.espressif.com/projects/idf-component-manager/
+
+dependencies:
+  espressif/esp-dsp: "^1.5.0"
+  espressif/esp-tflite-micro: "*"
+  idf:
+    version: ">=5.0"

@@ -1,0 +1,21 @@
+menu "Blue Brain Connectivity"
+
+    config BB_WIFI_SSID
+        string "WiFi SSID"
+        default "Mega-2.4G-D9B1"
+        help
+            SSID of the WiFi network to connect to.
+
+    config BB_WIFI_PASS
+        string "WiFi Password"
+        default "AcP6U9qbZg"
+        help
+            Password of the WiFi network.
+
+    config BB_MQTT_URI
+        string "MQTT Broker URI"
+        default "mqtt://62.72.6.94:1883"
+        help
+            URI of the MQTT Broker (e.g., mqtt://broker.hivemq.com)
+
+endmenu

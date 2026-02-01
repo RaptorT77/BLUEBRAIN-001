@@ -1,0 +1,729 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Blue Brain Dashboard</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .input-help {
+            display: block;
+            font-size: 0.8em;
+            color: #888;
+            margin-top: 4px;
+        }
+
+        .thresh-group {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .time-display {
+            font-size: 0.9em;
+            color: #ccc;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <nav class="sidebar">
+            <div class="logo">
+                <h2>🧠 BlueBrain</h2>
+            </div>
+            <ul class="nav-links">
+                <li><a href="#" class="active" onclick="showTab('dashboard', this); return false;">Dashboard</a></li>
+                <li><a href="#" onclick="showTab('config', this); return false;">Configuración</a></li>
+                <li><a href="#" onclick="showTab('system', this); return false;">Sistema</a></li>
+                <li><a href="#" onclick="showTab('training', this); return false;">Entrenamiento</a></li>
+            </ul>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="content">
+
+            <!-- Dashboard Tab -->
+            <div id="dashboard" class="tab-content active">
+                <header>
+                    <h1>Estado del Motor</h1>
+                    <div style="text-align: right;">
+                        <div class="status-badge" id="connStatus" style="background: #FF5252">Desconectado</div>
+                        <div class="time-display" id="dashTime">--:--:--</div>
+                    </div>
+                </header>
+
+                <div class="cards-grid">
+                    <!-- AI Classification -->
+                    <div class="card ai-card">
+                        <h3>Diagnóstico IA</h3>
+                        <div class="ai-result" id="aiResult">Esperando datos...</div>
+                        <div class="confidence-bar">
+                            <div class="bar-fill" id="confidenceFill" style="width: 0%"></div>
+                        </div>
+                        <span id="confidenceText">0% Confianza</span>
+                    </div>
+
+                    <!-- Vibration Metrics -->
+                    <div class="card" id="cardRms">
+                        <h3>RMS (g)</h3>
+                        <div class="value" id="valRms">0.000</div>
+                    </div>
+                    <div class="card" id="cardPeak">
+                        <h3>Peak (g)</h3>
+                        <div class="value" id="valPeak">0.000</div>
+                    </div>
+                    <div class="card">
+                        <h3>Crest Factor</h3>
+                        <div class="value" id="valCrest">0.00</div>
+                    </div>
+                    <div class="card" id="cardTemp">
+                        <h3>Temperatura</h3>
+                        <div class="value" id="valTemp">0.00 °C</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Configuration Tab -->
+            <div id="config" class="tab-content">
+                <header>
+                    <h1>Configuración</h1>
+                </header>
+
+                <div class="form-container">
+                    <form id="configForm">
+                        <p class="section-desc">Ajuste los parámetros operativos del nodo sensor.</p>
+
+                        <!-- WiFi -->
+                        <div class="form-section">
+                            <h2>📶 Conectividad WiFi</h2>
+                            <div class="input-group">
+                                <label>SSID</label>
+                                <input type="text" id="cfg_wifi_ssid" required>
+                                <span class="input-help">Nombre de la red WiFi a la que se conectará el
+                                    dispositivo.</span>
+                            </div>
+                            <div class="input-group">
+                                <label>Password</label>
+                                <input type="password" id="cfg_wifi_pass" placeholder="******">
+                                <span class="input-help">Contraseña de la red (dejar en blanco para no cambiar).</span>
+                            </div>
+                        </div>
+
+                        <!-- MQTT -->
+                        <div class="form-section">
+                            <h2>☁️ Servidor MQTT</h2>
+                            <div class="input-group">
+                                <label>URI del Broker</label>
+                                <input type="text" id="cfg_mqtt_uri">
+                                <span class="input-help">Dirección del servidor (ej. mqtt://test.mosquitto.org).</span>
+                            </div>
+                            <div class="input-group">
+                                <label>Puerto</label>
+                                <input type="number" id="cfg_mqtt_port">
+                                <span class="input-help">Puerto TCP (usualmente 1883 o 8883 para SSL).</span>
+                            </div>
+                            <div class="input-group">
+                                <label>Usuario</label>
+                                <input type="text" id="cfg_mqtt_user">
+                                <span class="input-help">Usuario MQTT (opcional).</span>
+                            </div>
+                            <div class="input-group">
+                                <label>Topic Telemetría</label>
+                                <input type="text" id="cfg_mqtt_topic">
+                                <span class="input-help">Ruta donde se publicarán los datos JSON.</span>
+                            </div>
+                        </div>
+
+                        <!-- Thresholds -->
+                        <div class="form-section">
+                            <h2>⚠️ Umbrales de Alarma</h2>
+                            <p class="section-desc">Defina los límites para colorear el dashboard (Amarillo=Precaución,
+                                Rojo=Crítico).</p>
+
+                            <label style="margin-top:10px; display:block;"><strong>Vibración RMS (g)</strong></label>
+                            <div class="thresh-group">
+                                <div class="input-group">
+                                    <label>Precaución (Warn)</label>
+                                    <input type="number" step="0.1" id="cfg_rms_warn">
+                                </div>
+                                <div class="input-group">
+                                    <label>Crítico (Alarm)</label>
+                                    <input type="number" step="0.1" id="cfg_rms_crit">
+                                </div>
+                            </div>
+
+                            <label style="margin-top:10px; display:block;"><strong>Temperatura (°C)</strong></label>
+                            <div class="thresh-group">
+                                <div class="input-group">
+                                    <label>Precaución (Warn)</label>
+                                    <input type="number" step="1" id="cfg_temp_warn">
+                                </div>
+                                <div class="input-group">
+                                    <label>Crítico (Alarm)</label>
+                                    <input type="number" step="1" id="cfg_temp_crit">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Adquisición -->
+                        <div class="form-section">
+                            <h2>📊 Adquisición de Señal</h2>
+                            <div class="input-group">
+                                <label>Frecuencia de Muestreo (Hz)</label>
+                                <select id="cfg_sample_rate">
+                                    <option value="1000">1000 Hz</option>
+                                    <option value="2000">2000 Hz</option>
+                                    <option value="4000">4000 Hz</option>
+                                </select>
+                                <span class="input-help">Velocidad de captura de datos del acelerómetro.</span>
+                            </div>
+                            <div class="input-group">
+                                <label>Cantidad de Muestras</label>
+                                <select id="cfg_n_samples">
+                                    <option value="512">512</option>
+                                    <option value="1024">1024</option>
+                                    <option value="2048">2048</option>
+                                </select>
+                                <span class="input-help">Tamaño del buffer para el cálculo de FFT.</span>
+                            </div>
+                        </div>
+
+                        <!-- ESP-NOW -->
+                        <div class="form-section">
+                            <h2>⚡ ESP-NOW</h2>
+                            <div class="checkbox-group">
+                                <input type="checkbox" id="cfg_espnow_en">
+                                <label>Habilitar Transmisión ESP-NOW</label>
+                            </div>
+                            <span class="input-help">Protocolo de baja latencia para comunicación local entre
+                                ESP32.</span>
+                        </div>
+
+                        <button type="submit" class="btn-save">Guardar Cambios</button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Training Tab -->
+            <div id="training" class="tab-content">
+                <header>
+                    <h1>Entrenamiento IA</h1>
+                </header>
+
+                <div class="form-container">
+
+                    <!-- 1. Control de Modo -->
+                    <div class="card" style="border-left: 5px solid #aaa;" id="modeCard">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <h3>Modo de Operación</h3>
+                                <p id="modeStatus">Normal (Producción)</p>
+                            </div>
+                            <label class="switch">
+                                <input type="checkbox" id="modeToggle" onchange="toggleMode()">
+                                <span class="slider round"></span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- 2. Configuración (Hidden by default) -->
+                    <div id="captureConfig" style="display:none; margin-top: 20px;">
+                        <div class="form-section">
+                            <h2>📸 Configuración de Captura</h2>
+                            <form id="trainForm">
+                                <div class="input-group">
+                                    <label>Clase a Capturar</label>
+                                    <select id="train_label">
+                                        <option value="0">0 - Sano / Normal</option>
+                                        <option value="1">1 - Desbalance</option>
+                                        <option value="2">2 - Falla de Rodamiento</option>
+                                    </select>
+                                </div>
+                                <div class="thresh-group">
+                                    <div class="input-group">
+                                        <label>Muestras (Buffer)</label>
+                                        <select id="train_samples">
+                                            <option value="500">500</option>
+                                            <option value="1000">1000</option>
+                                            <option value="2000">2048 (Default)</option>
+                                            <option value="4000">4000</option>
+                                            <option value="8000">8000</option>
+                                            <option value="16000">16000</option>
+                                            <option value="32000">32000</option>
+                                        </select>
+                                    </div>
+                                    <div class="input-group">
+                                        <label>Frecuencia de Muestreo</label>
+                                        <select id="train_freq">
+                                            <option value="500">500 Hz</option>
+                                            <option value="1000">1000 Hz</option>
+                                            <option value="2000">2000 Hz</option>
+                                            <option value="4000">4000 Hz</option>
+                                            <option value="8000">8000 Hz</option>
+                                            <option value="16000">16000 Hz</option>
+                                            <option value="32000">32000 Hz</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <button type="button" id="btnStartCapture" class="btn-save"
+                                    style="background:#00E676; margin-top:10px;" onclick="startCapture()">Iniciar
+                                    Captura</button>
+                            </form>
+                        </div>
+                    </div>
+
+                    <!-- 3. Progreso -->
+                    <div id="captureProgress" style="display:none; margin-top: 20px;">
+                        <div class="card">
+                            <h3>Progreso</h3>
+                            <div class="progress-container"
+                                style="background:#333; height:20px; border-radius:10px; overflow:hidden; margin: 10px 0;">
+                                <div id="progressBar"
+                                    style="width:0%; height:100%; background:#2196F3; transition: width 0.5s;"></div>
+                            </div>
+                            <div style="display:flex; justify-content:space-between;">
+                                <span id="progressText">0 de 0</span>
+                                <span id="progressPercent">0%</span>
+                            </div>
+                            <div style="margin-top:10px; text-align:center;">
+                                <span id="statusBadge" class="status-badge"
+                                    style="background:#2196F3">Esperando...</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 4. Gestión Dataset -->
+                    <div class="form-section" style="margin-top: 20px;">
+                        <h2>📂 Gestión del Dataset</h2>
+                        <div class="cards-grid">
+                            <div class="card">
+                                <h3>Estadísticas</h3>
+                                <p class="stat-row"><span>Total Muestras:</span> <strong id="lblTotalSamples">0</strong>
+                                </p>
+                                <hr style="border-color:#444; margin: 5px 0;">
+                                <p class="stat-row"><small>Clase 0 (Sano):</small> <span id="lblClass0">0</span></p>
+                                <p class="stat-row"><small>Clase 1 (Desb):</small> <span id="lblClass1">0</span></p>
+                                <p class="stat-row"><small>Clase 2 (Falla):</small> <span id="lblClass2">0</span></p>
+                                <p class="stat-row" style="margin-top:5px;">💾 <small id="lblStorage">0 KB</small></p>
+                            </div>
+                            <div class="card">
+                                <h3>Acciones</h3>
+                                <button class="btn-save"
+                                    style="background:#2196F3; font-size: 0.9em; margin-bottom:5px;"
+                                    onclick="downloadDataset()">📥 Descargar CSV</button>
+                                <button class="btn-save"
+                                    style="background:#757575; font-size: 0.9em; margin-bottom:5px;"
+                                    onclick="previewDataset()">👁️ Vista Previa</button>
+                                <button class="btn-save" style="background:#FF5252; font-size: 0.9em;"
+                                    onclick="clearDataset()">🗑️ Borrar Todo</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 5. Log -->
+                    <div class="form-section" style="margin-top: 20px;">
+                        <h2>📜 Log (Últimos eventos)</h2>
+                        <div id="logArea"
+                            style="height: 150px; background: #111; color: #0f0; padding: 10px; font-family: monospace; font-size: 0.8em; overflow-y: scroll; border: 1px solid #333;">
+                            > Sistema listo...
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- System Tab -->
+            <div id="system" class="tab-content">
+                <header>
+                    <h1>Sistema</h1>
+                </header>
+
+                <div class="cards-grid">
+                    <div class="card">
+                        <h3>Acciones</h3>
+                        <p>Reiniciar el dispositivo aplicará cambios y reconectará WiFi.</p>
+                        <button class="btn-save"
+                            style="background: #FF5252; width: auto; padding: 10px 20px; margin-top: 10px;"
+                            onclick="restartDevice()">⚠️ Reiniciar Dispositivo</button>
+                    </div>
+
+                    <div class="card">
+                        <h3>Fecha y Hora</h3>
+                        <div class="value" id="sysTime" style="font-size: 1.2em;">--:--:--</div>
+                        <p style="font-size: 0.8em; color: #888; margin-bottom: 10px;">La hora se pierde al reiniciar si
+                            no hay WiFi.</p>
+                        <button class="btn-save" style="background: #2196F3; width: auto; padding: 10px 20px;"
+                            onclick="syncTime()">⏱️ Sincronizar con Navegador</button>
+                    </div>
+
+                    <div class="card">
+                        <h3>Información</h3>
+                        <p><strong>Firmware:</strong> v1.2.0 (BlueBrain)</p>
+                        <p><strong>Estado:</strong> Ejecutando</p>
+                    </div>
+                </div>
+            </div>
+
+
+        </main>
+    </div>
+
+    <!-- Code Inlined for Reliability -->
+    <script>
+        // Global Config Cache (Defaults)
+        let g_cfg = {
+            rms_warn: 2.0, rms_crit: 4.0,
+            temp_warn: 60.0, temp_crit: 80.0
+        };
+        let g_config_loaded = false;
+
+        function showTab(tabId, el) {
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            document.querySelectorAll('.nav-links a').forEach(a => a.classList.remove('active'));
+
+            document.getElementById(tabId).classList.add('active');
+            if (el) el.classList.add('active');
+
+            if (tabId === 'config') loadConfig(true); // Populate form
+        }
+
+        // Init
+        loadConfig(false); // Load silently on start
+        console.log("BlueBrain UI Started (Inline 500ms)");
+        setInterval(fetchMetrics, 500);
+
+        async function fetchMetrics() {
+            try {
+                const response = await fetch('/api/v1/status');
+                if (!response.ok) throw new Error("Network response was not ok");
+                const data = await response.json();
+
+                // --- Update Values ---
+                const elRms = document.getElementById('valRms');
+                const elPeak = document.getElementById('valPeak');
+                const elCrest = document.getElementById('valCrest');
+                const elTemp = document.getElementById('valTemp');
+
+                if (elRms) elRms.innerText = data.rms.toFixed(3);
+                if (elPeak) elPeak.innerText = data.peak.toFixed(3);
+                if (elCrest) elCrest.innerText = data.crest.toFixed(2);
+                if (elTemp) elTemp.innerText = data.temp.toFixed(1) + " °C";
+
+                // Update Time
+                if (data.timestamp) {
+                    if (document.getElementById('dashTime')) document.getElementById('dashTime').innerText = data.timestamp;
+                    if (document.getElementById('sysTime')) document.getElementById('sysTime').innerText = data.timestamp;
+                }
+
+                // --- Color Logic (Thresholds) ---
+                if (g_config_loaded) {
+                    updateCardColor('cardRms', data.rms, g_cfg.rms_warn, g_cfg.rms_crit);
+                    updateCardColor('cardTemp', data.temp, g_cfg.temp_warn, g_cfg.temp_crit);
+                }
+
+                // --- AI Logic ---
+                const aiText = document.getElementById('aiResult');
+                const aiBar = document.getElementById('confidenceFill');
+                const aiConf = document.getElementById('confidenceText');
+
+                if (aiText) {
+                    let status = "Desconocido";
+                    let color = "#555";
+
+                    switch (parseInt(data.ai_class)) {
+                        case 0: status = "🟢 SANO"; color = "#00E676"; break;
+                        case 1: status = "⚠️ DESBALANCEO"; color = "#FFC107"; break;
+                        case 2: status = "🛑 FALLA RODAMIENTO"; color = "#FF5252"; break;
+                    }
+
+                    aiText.innerText = status;
+                    if (aiBar) {
+                        aiBar.style.width = (data.ai_conf * 100) + "%";
+                        aiBar.style.backgroundColor = color;
+                    }
+                    if (aiConf) aiConf.innerText = Math.round(data.ai_conf * 100) + "% Confianza";
+                }
+
+                // Connection Status
+                if (document.getElementById('connStatus')) {
+                    document.getElementById('connStatus').innerText = "Conectado";
+                    document.getElementById('connStatus').style.background = "#00E676";
+                }
+
+                // --- Training Progress (ADDED) ---
+                if (data.train_active !== undefined) {
+                    const isTrain = data.train_active;
+                    const count = data.train_count || 0;
+                    const target = data.train_target || 1;
+
+                    // Update Badge
+                    const badge = document.getElementById('statusBadge');
+                    if (badge) {
+                        if (isTrain) {
+                            badge.innerText = "Capturando...";
+                            badge.style.background = "#2196F3";
+
+                            // Enable btn if it was disabled (unless we want to keep it disabled)
+                            // Actually keep it disabled while running
+                        } else {
+                            // If we were capturing and now we are not, show Complete
+                            if (document.getElementById('btnStartCapture').disabled) {
+                                badge.innerText = "Completado";
+                                badge.style.background = "#00E676";
+                                document.getElementById('btnStartCapture').disabled = false;
+                                document.getElementById('btnStartCapture').innerText = "Iniciar Captura";
+                                // Refresh stats
+                                setTimeout(clearDataset, 100); // Hack to refresh stats logic if implemented? 
+                                // Or better: call a stats refresh.
+                                // For now just reset button.
+                            }
+                        }
+                    }
+
+                    // Update Progress Bar
+                    if (target > 0) {
+                        const pct = Math.min(100, Math.round((count / target) * 100));
+                        const progressBar = document.getElementById('progressBar');
+                        const progressText = document.getElementById('progressText');
+                        const progressPercent = document.getElementById('progressPercent');
+
+                        if (progressBar) progressBar.style.width = pct + "%";
+                        if (progressText) progressText.innerText = `${count} de ${target}`;
+                        if (progressPercent) progressPercent.innerText = pct + "%";
+
+                        // Storage estimation (approx 100 bytes/line?)
+                        const estSizeKB = Math.round((count * 200) / 1024); // Rough guess
+                        if (document.getElementById('lblTotalSamples')) document.getElementById('lblTotalSamples').innerText = count;
+                        if (document.getElementById('lblStorage')) document.getElementById('lblStorage').innerText = estSizeKB + " KB";
+                    }
+                }
+            } catch (e) {
+                if (document.getElementById('connStatus')) {
+                    document.getElementById('connStatus').innerText = "Desconectado";
+                    document.getElementById('connStatus').style.background = "#FF5252";
+                }
+            }
+        }
+
+        function updateCardColor(cardId, val, warn, crit) {
+            const card = document.getElementById(cardId);
+            if (!card) return;
+
+            // Logic: Normal(Def) -> Warn(Yellow) -> Crit(Red)
+            if (val >= crit) {
+                card.style.borderLeft = "5px solid #FF5252"; // Red
+                // Optionally change text color?
+            } else if (val >= warn) {
+                card.style.borderLeft = "5px solid #FFC107"; // Yellow
+            } else {
+                card.style.borderLeft = "5px solid transparent"; // Default
+            }
+        }
+
+        async function loadConfig(populateForm) {
+            try {
+                const res = await fetch('/api/v1/config');
+                const cfg = await res.json();
+
+                // Cache global params
+                g_cfg.rms_warn = cfg.rms_warn || 2.0;
+                g_cfg.rms_crit = cfg.rms_crit || 4.0;
+                g_cfg.temp_warn = cfg.temp_warn || 60.0;
+                g_cfg.temp_crit = cfg.temp_crit || 80.0;
+                g_config_loaded = true;
+
+                if (populateForm) {
+                    if (document.getElementById('cfg_wifi_ssid')) document.getElementById('cfg_wifi_ssid').value = cfg.wifi_ssid || "";
+                    if (document.getElementById('cfg_wifi_pass')) document.getElementById('cfg_wifi_pass').value = ""; // Don't show pass
+                    if (document.getElementById('cfg_mqtt_uri')) document.getElementById('cfg_mqtt_uri').value = cfg.mqtt_uri || "";
+                    if (document.getElementById('cfg_mqtt_port')) document.getElementById('cfg_mqtt_port').value = cfg.mqtt_port || 1883;
+                    if (document.getElementById('cfg_mqtt_user')) document.getElementById('cfg_mqtt_user').value = cfg.mqtt_user || "";
+                    if (document.getElementById('cfg_mqtt_topic')) document.getElementById('cfg_mqtt_topic').value = cfg.mqtt_topic || "";
+
+                    if (document.getElementById('cfg_sample_rate')) document.getElementById('cfg_sample_rate').value = cfg.sample_rate || 1000;
+                    if (document.getElementById('cfg_n_samples')) document.getElementById('cfg_n_samples').value = cfg.n_samples || 1024;
+                    if (document.getElementById('cfg_espnow_en')) document.getElementById('cfg_espnow_en').checked = cfg.espnow_en || false;
+
+                    // Thresholds
+                    if (document.getElementById('cfg_rms_warn')) document.getElementById('cfg_rms_warn').value = cfg.rms_warn;
+                    if (document.getElementById('cfg_rms_crit')) document.getElementById('cfg_rms_crit').value = cfg.rms_crit;
+                    if (document.getElementById('cfg_temp_warn')) document.getElementById('cfg_temp_warn').value = cfg.temp_warn;
+                    if (document.getElementById('cfg_temp_crit')) document.getElementById('cfg_temp_crit').value = cfg.temp_crit;
+                }
+            } catch (e) {
+                console.error("Config Load Error:", e);
+                if (populateForm) alert("Error cargando configuración");
+            }
+        }
+
+        async function restartDevice() {
+            if (!confirm("¿Estás seguro de reiniciar el dispositivo?")) return;
+            try {
+                await fetch('/api/v1/restart', { method: 'POST' });
+                alert("Reiniciando... Espere unos segundos y reconecte.");
+            } catch (e) {
+                alert("Error enviando comando de reinicio");
+            }
+        }
+
+        async function syncTime() {
+            const now = new Date();
+            const epoch = Math.floor(now.getTime() / 1000);
+
+            try {
+                await fetch('/api/v1/time', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ epoch: epoch })
+                });
+                alert("Hora sincronizada correctamente: " + now.toLocaleString());
+            } catch (e) {
+                console.error("Time Sync Error:", e);
+                alert("Error sincronizando hora.");
+            }
+        }
+
+        const form = document.getElementById('configForm');
+        if (form) {
+            form.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const data = {
+                    wifi_ssid: document.getElementById('cfg_wifi_ssid').value,
+                    wifi_pass: document.getElementById('cfg_wifi_pass').value,
+                    mqtt_uri: document.getElementById('cfg_mqtt_uri').value,
+                    mqtt_port: parseInt(document.getElementById('cfg_mqtt_port').value),
+                    mqtt_user: document.getElementById('cfg_mqtt_user').value,
+                    mqtt_topic: document.getElementById('cfg_mqtt_topic').value,
+                    sample_rate: parseInt(document.getElementById('cfg_sample_rate').value),
+                    n_samples: parseInt(document.getElementById('cfg_n_samples').value),
+                    espnow_en: document.getElementById('cfg_espnow_en').checked,
+                    // Thresholds
+                    rms_warn: parseFloat(document.getElementById('cfg_rms_warn').value),
+                    rms_crit: parseFloat(document.getElementById('cfg_rms_crit').value),
+                    temp_warn: parseFloat(document.getElementById('cfg_temp_warn').value),
+                    temp_crit: parseFloat(document.getElementById('cfg_temp_crit').value),
+                };
+
+                if (!data.wifi_pass) delete data.wifi_pass;
+
+                try {
+                    await fetch('/api/v1/config', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(data)
+                    });
+                    // Update global cache immediately
+                    g_cfg.rms_warn = data.rms_warn;
+                    g_cfg.rms_crit = data.rms_crit;
+                    g_cfg.temp_warn = data.temp_warn;
+                    g_cfg.temp_crit = data.temp_crit;
+
+                    alert("Configuración Guardada. Reinicie el dispositivo para aplicar.");
+                } catch (e) {
+                    console.error("Save Error:", e);
+                    alert("Error guardando configuración");
+                }
+            });
+        }
+
+        // --- Training Logic ---
+        function toggleMode() {
+            const isTraining = document.getElementById('modeToggle').checked;
+            const modeText = document.getElementById('modeStatus');
+            const configDiv = document.getElementById('captureConfig');
+            const progressDiv = document.getElementById('captureProgress');
+
+            if (isTraining) {
+                modeText.innerText = "Entrenamiento (Captura Datos)";
+                modeText.style.color = "#FF9800";
+                configDiv.style.display = "block";
+                progressDiv.style.display = "block";
+                // Send Command
+                postCommand({ cmd: "set_mode", mode: "training" });
+                addToLog("Modo cambiado a ENTRENAMIENTO");
+            } else {
+                modeText.innerText = "Normal (Producción)";
+                modeText.style.color = "#ccc";
+                configDiv.style.display = "none";
+                progressDiv.style.display = "none";
+                // Send Command
+                postCommand({ cmd: "set_mode", mode: "production" });
+                addToLog("Modo cambiado a PRODUCCIÓN");
+            }
+        }
+
+        async function startCapture() {
+            const label = parseInt(document.getElementById('train_label').value);
+            const samples = parseInt(document.getElementById('train_samples').value);
+            const freq = parseFloat(document.getElementById('train_freq').value);
+
+            document.getElementById('btnStartCapture').disabled = true;
+            document.getElementById('btnStartCapture').innerText = "Iniciando...";
+
+            try {
+                await postCommand({
+                    cmd: "start_capture",
+                    label: label,
+                    samples: samples,
+                    freq_hz: freq
+                });
+                addToLog(`Captura iniciada: Clase=${label}, N=${samples}`);
+                document.getElementById('statusBadge').innerText = "Capturando...";
+                document.getElementById('statusBadge').style.background = "#2196F3"; // Blue pulsing
+            } catch (e) {
+                addToLog("Error iniciando captura");
+                document.getElementById('btnStartCapture').disabled = false;
+                document.getElementById('btnStartCapture').innerText = "Iniciar Captura";
+            }
+        }
+
+        async function clearDataset() {
+            if (!confirm("¿Seguro que deseas borrar TODO el dataset?")) return;
+            await postCommand({ cmd: "clear_dataset" });
+            addToLog("Dataset borrado");
+            document.getElementById('lblTotalSamples').innerText = "0";
+            document.getElementById('lblClass0').innerText = "0";
+            document.getElementById('lblClass1').innerText = "0";
+            document.getElementById('lblClass2').innerText = "0";
+            document.getElementById('lblStorage').innerText = "0 KB";
+        }
+
+        function downloadDataset() {
+            window.location.href = "/download_dataset";
+            addToLog("Descargando dataset...");
+        }
+
+        function previewDataset() {
+            addToLog("Vista previa no implementada aún (Requiere API extra)");
+            alert("Funcionalidad de vista previa próximamente.");
+        }
+
+        async function postCommand(data) {
+            const res = await fetch('/api/v1/command', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            if (!res.ok) throw new Error("Cmd Error");
+        }
+
+        function addToLog(msg) {
+            const log = document.getElementById('logArea');
+            if (!log) return;
+            const time = new Date().toLocaleTimeString();
+            log.innerHTML += `<div>[${time}] ${msg}</div>`;
+            log.scrollTop = log.scrollHeight;
+        }
+
+        // Extend Poll for Training Status
+        // Note: Ideally we add training info to /api/v1/status response
+        // For now, we assume status contains 'training' obj if active
+        // I will update bb_web_ui.c to include this.
+    </script>
+</body>
+
+</html>

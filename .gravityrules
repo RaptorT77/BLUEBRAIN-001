@@ -3,26 +3,29 @@ Target: Seeed Studio XIAO ESP32-S3 (Standard Version - No Camera) via ESP-IDF.
 Style: FreeRTOS mandatory for multitasking with industrial-grade reliability.
 
 # --- SECTION 1: HARDWARE DEFINITION (STRICT) ---
+# ⚠️ IMPORTANTE: La configuración detallada está en HARDWARE_CONFIG.md
+# Este archivo debe sincronizarse con HARDWARE_CONFIG.md
+
 Microcontroller: Seeed Studio XIAO ESP32-S3
-Pin Mapping:
-  // I2C Bus (Sensor: GY-521 / MPU6050)
-  #define PIN_I2C_SDA      GPIO_NUM_6  // D4 is GPIO 6
-  #define PIN_I2C_SCL      GPIO_NUM_7  // D5 is GPIO 7
+Pin Mapping (ACTUAL - Verificado 31/Ene/2026):
+  // I2C Bus (Sensor: MPU6050)
+  #define PIN_I2C_SDA      GPIO_NUM_5  // D4 es GPIO 5
+  #define PIN_I2C_SCL      GPIO_NUM_6  // D5 es GPIO 6
    
-  // SPI Bus (Display: ST7789 240x240)
-  #define PIN_SPI_MOSI     GPIO_NUM_10 // D10 is GPIO 10
-  #define PIN_SPI_CLK      GPIO_NUM_8  // D8 is GPIO 8
-  #define PIN_DISP_CS      GPIO_NUM_2  // D0 is GPIO 2
-  #define PIN_DISP_DC      GPIO_NUM_3  // D1 is GPIO 3
-  #define PIN_DISP_RST     GPIO_NUM_4  // D2 is GPIO 4
+  // SPI Bus (Display: ST7789 240x240) - NO IMPLEMENTADO AÚN
+  #define PIN_SPI_MOSI     GPIO_NUM_10 // D10 es GPIO 10
+  #define PIN_SPI_CLK      GPIO_NUM_8  // D8 es GPIO 8
+  #define PIN_DISP_CS      GPIO_NUM_2  // D0 es GPIO 2
+  #define PIN_DISP_DC      GPIO_NUM_3  // D1 es GPIO 3
+  #define PIN_DISP_RST     GPIO_NUM_4  // D2 es GPIO 4
   // Note: Connect Display BLK (Backlight) to 3.3V.
 
   // 1-Wire (Sensor: DS18B20)
-  #define PIN_ONE_WIRE     GPIO_NUM_5  // D3 is GPIO 5
+  #define PIN_ONE_WIRE     GPIO_NUM_4  // D3 es GPIO 4
    
   // Debug UART (Specific for XIAO S3)
-  #define PIN_UART_TX      GPIO_NUM_43 // D6 is GPIO 43
-  #define PIN_UART_RX      GPIO_NUM_44 // D7 is GPIO 44
+  #define PIN_UART_TX      GPIO_NUM_43 // D6 es GPIO 43
+  #define PIN_UART_RX      GPIO_NUM_44 // D7 es GPIO 44
 
   // System Input
   #define PIN_BOOT_BTN     GPIO_NUM_0  // Internal Boot Button
